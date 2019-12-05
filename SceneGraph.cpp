@@ -118,7 +118,7 @@ void Geometry::parse(std::string objFilename)
 	// Max and min dimension trackers
 	GLfloat maxX = 0.0f, maxY = 0.0f, maxZ = 0.0f;
 	GLfloat minX = 0.0f, minY = 0.0f, minZ = 0.0f;
-
+	int xd = 0;
 	std::ifstream objFile(objFilename); // The obj file we are reading.
 
 	// Check whether the file can be opened.
@@ -174,9 +174,16 @@ void Geometry::parse(std::string objFilename)
 				unsigned int v_faceX, v_faceY, v_faceZ;
 				unsigned int vn_faceX, vn_faceY, vn_faceZ;
 				char ignore;
-				ss >> v_faceX >> ignore >> ignore >> vn_faceX;
-				ss >> v_faceY >> ignore >> ignore >> vn_faceY;
-				ss >> v_faceZ >> ignore >> ignore >> vn_faceZ;
+				unsigned ignore2;
+				ss >> v_faceX >> ignore >> ignore2 >> ignore >> vn_faceX;
+				ss >> v_faceY >> ignore >> ignore2 >> ignore >> vn_faceY;
+				ss >> v_faceZ >> ignore >> ignore2 >> ignore >> vn_faceZ;
+				if (xd < 10)
+				{
+					printf("%d, %d, %d\n", v_faceX, v_faceY, v_faceZ);
+					printf("%d, %d, %d\n", vn_faceX, vn_faceY, vn_faceZ);
+				}
+				xd++;
 				indices.push_back(v_faceX - 1);
 				indices.push_back(v_faceY - 1);
 				indices.push_back(v_faceZ - 1);
@@ -201,7 +208,7 @@ void Geometry::parse(std::string objFilename)
 		maxDistance = maxZ - minZ;
 	}
 
-	initial = glm::scale(glm::mat4(1.0f), glm::vec3((2.0f/ maxDistance), (2.0f / maxDistance), (2.0f/ maxDistance)));
+	initial = glm::mat4(1.0f);//glm::scale(glm::mat4(1.0f), glm::vec3((2.0f/ maxDistance), (2.0f / maxDistance), (2.0f/ maxDistance)));
 }
 
 void Geometry::draw(glm::mat4 C)

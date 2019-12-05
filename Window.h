@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string>
+#include <irrKlang.h>
 
 #include "shader.h"
 #include "stb_image.h"

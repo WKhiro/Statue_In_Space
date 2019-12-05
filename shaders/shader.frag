@@ -25,7 +25,7 @@ void main()
 {
 	if (light.normalColoring == 1) 
 	{
-		color = vec4(Normal.x, Normal.y, Normal.z, 1.0f);
+		color = vec4(0, 0, 1, 1.0f);
 	}
 	else 
 	{

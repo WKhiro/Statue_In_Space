@@ -1,7 +1,7 @@
-#include "window.h"
-#include <GL/glut.h>
+#include "Window.h"
 #include <time.h>
 
+using namespace irrklang;
 
 GLFWwindow* window;
 
@@ -10,6 +10,7 @@ const char* window_title = "Shower Thoughts";
 int Window::width;
 int Window::height;
 
+ISoundEngine* SoundEngine = createIrrKlangDevice();
 
 double Window::oldX = 0;
 double Window::oldY = 0;
@@ -82,6 +83,7 @@ std::vector<std::string> faces =
 
 bool Window::initializeProgram() 
 {
+	SoundEngine->play2D("audio/rain.mp3", GL_TRUE);
 	shader = LoadShaders("shaders/shader.vert", "shaders/shader.frag");
 	skyShader = LoadShaders("shaders/skyShader.vert", "shaders/skyShader.frag");
 	selection = LoadShaders("shaders/selectionShader.vert", "shaders/selectionShader.frag");
@@ -141,13 +143,12 @@ void drawRain() {
 			z = par_sys[loop].zpos + eye.z/2; //zoom
 			// Draw particles
 			glBegin(GL_POINTS);
-			glColor3f(1.0, 0.0, 0.0);
+			glColor3f(0.0, 1.0, 0.0);
 			glVertex3f(x, y, z);
 			glVertex3f(x, y + 0.5, z);
 			glEnd();
 
-			// Update values
-			//Move
+			// Movement
 			// Adjust slowdown for speed!
 			par_sys[loop].ypos += par_sys[loop].vel / (2.0 * 1000);
 			par_sys[loop].vel += par_sys[loop].gravity;
@@ -172,8 +173,8 @@ bool Window::initializeObjects()
 	glEnable(GL_DEPTH_TEST);
 
 	// Roller Coaster
-	rollerCoaster = new Geometry("sphere.obj", shader, environment, 2);
-	rollerCoaster->environmentMap = 1;
+	rollerCoaster = new Geometry("nanosuit.obj", shader, 0, 2);
+	rollerCoaster->environmentMap = 0;
 
 	for (int loop = 0; loop < MAXX; loop++) {
 		initParticles(loop);
@@ -398,14 +399,7 @@ void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, 
 			}
 			break;
 		case GLFW_KEY_P: // Pause
-			if (pause) 
-			{
-				pause = false;
-			}
-			else 
-			{
-				pause = true;
-			}
+			SoundEngine->play2D("audio/faucet.mp3", GL_FALSE);
 			break;
 		default:
 			break;
