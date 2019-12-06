@@ -36,7 +36,7 @@ void SkyBox::draw(GLuint skyShader, unsigned int cubemapTexture)
 
 	glUniformMatrix4fv(projectLoc, 1, GL_FALSE, &Window::projection[0][0]);
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &Window::view[0][0]);
-	glUniform1i(skybox, 0);
+	glUniform1i(skybox, 0);	
 
 	glBindVertexArray(VAO);
 	glActiveTexture(GL_TEXTURE0);
