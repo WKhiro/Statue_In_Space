@@ -55,6 +55,17 @@ unsigned int container;
 unsigned int cubeMapTexture;
 SkyBox * skyBox;
 
+GLfloat ctrlpoints[4][4][3] = {
+   {{-1.5, -1.5, 4.0}, {-0.5, -1.5, 2.0},
+	{0.5, -1.5, -1.0}, {1.5, -1.5, 2.0}},
+   {{-1.5, -0.5, 1.0}, {-0.5, -0.5, 3.0},
+	{0.5, -0.5, 0.0}, {1.5, -0.5, -1.0}},
+   {{-1.5, 0.5, 4.0}, {-0.5, 0.5, 0.0},
+	{0.5, 0.5, 3.0}, {1.5, 0.5, 4.0}},
+   {{-1.5, 1.5, -2.0}, {-0.5, 1.5, -2.0},
+	{0.5, 1.5, 0.0}, {1.5, 1.5, -1.0}}
+};
+
 Geometry* rollerCoaster;
 
 glm::vec3 Window::currentPos;
@@ -169,7 +180,7 @@ void drawRain() {
 
 	float x, y, z;
 	glUseProgram(skyShader);
-	glUniform3f(glGetUniformLocation(skyShader, "set_color"), 0.0f, 0.0f, 1.0f);
+	glUniform3f(glGetUniformLocation(skyShader, "set_color"), 0.0f, 1.0f, 0.0f);
 	for (int loop = 0; loop < MAXX; loop++) 
 	{
 		if (par_sys[loop].alive == true) 
@@ -211,6 +222,106 @@ void drawRain() {
 		else if (par_sys[loop].alive == false && raining)
 		{
 				initParticles(loop);
+		}
+	}
+}
+
+void drawSides() {
+
+	float x, y, z;
+	glUseProgram(skyShader);
+	glUniform3f(glGetUniformLocation(skyShader, "set_color"), 0.0f, 1.0f, 0.0f);
+	for (int loop = 0; loop < MAXX; loop++)
+	{
+		if (par_sys[loop].alive == true)
+		{
+			x = par_sys[loop].xpos + eye.x / 2;
+			y = par_sys[loop].ypos + eye.y / 2;
+			z = par_sys[loop].zpos + eye.z / 2; //zoom
+			tester = glm::translate(glm::mat4(1.0f), { x, y, z });
+			glm::mat4 MVP = Window::projection * Window::view * tester;
+			glm::vec3 test = glm::vec3(x, y, z);
+			glUniformMatrix4fv(glGetUniformLocation(skyShader, "MVP"), 1, GL_FALSE, &MVP[0][0]);
+			// Draw particles
+			glBegin(GL_POINTS);
+			glVertex3f(x, y, z);
+			//glVertex3f(x, y + 0.5, z);
+			glEnd();
+
+			// Movement
+			// Adjust slowdown for speed!
+			par_sys[loop].xpos += par_sys[loop].vel / (2.0 * 1000);
+			par_sys[loop].vel += par_sys[loop].gravity;
+			// Decay
+			par_sys[loop].life -= par_sys[loop].fade;
+
+			if (par_sys[loop].ypos <= -10)
+			{
+				par_sys[loop].life = -1.0;
+			}
+			//Revive
+			if (par_sys[loop].life < 0.0 && raining)
+			{
+				initParticles(loop);
+			}
+			else if (par_sys[loop].life < 0.0 && !raining)
+			{
+				par_sys[loop].alive = false;
+			}
+		}
+		else if (par_sys[loop].alive == false && raining)
+		{
+			initParticles(loop);
+		}
+	}
+}
+
+void drawSides2() {
+
+	float x, y, z;
+	glUseProgram(skyShader);
+	glUniform3f(glGetUniformLocation(skyShader, "set_color"), 0.0f, 1.0f, 0.0f);
+	for (int loop = 0; loop < MAXX; loop++)
+	{
+		if (par_sys[loop].alive == true)
+		{
+			x = par_sys[loop].xpos + eye.x / 2;
+			y = par_sys[loop].ypos + eye.y / 2;
+			z = par_sys[loop].zpos + eye.z / 2; //zoom
+			tester = glm::translate(glm::mat4(1.0f), { x, y, z });
+			glm::mat4 MVP = Window::projection * Window::view * tester;
+			glm::vec3 test = glm::vec3(x, y, z);
+			glUniformMatrix4fv(glGetUniformLocation(skyShader, "MVP"), 1, GL_FALSE, &MVP[0][0]);
+			// Draw particles
+			glBegin(GL_POINTS);
+			glVertex3f(x, y, z);
+			//glVertex3f(x, y + 0.5, z);
+			glEnd();
+
+			// Movement
+			// Adjust slowdown for speed!
+			par_sys[loop].xpos -= par_sys[loop].vel / (2.0 * 1000);
+			par_sys[loop].vel += par_sys[loop].gravity;
+			// Decay
+			par_sys[loop].life -= par_sys[loop].fade;
+
+			if (par_sys[loop].ypos <= -10)
+			{
+				par_sys[loop].life = -1.0;
+			}
+			//Revive
+			if (par_sys[loop].life < 0.0 && raining)
+			{
+				initParticles(loop);
+			}
+			else if (par_sys[loop].life < 0.0 && !raining)
+			{
+				par_sys[loop].alive = false;
+			}
+		}
+		else if (par_sys[loop].alive == false && raining)
+		{
+			initParticles(loop);
 		}
 	}
 }
@@ -262,17 +373,41 @@ unsigned int loadTexture(char const* path, bool gammaCorrection)
 
 	return textureID;
 }
+void initlights(void)
+{
+	GLfloat ambient[] = { 0.2, 0.2, 0.2, 1.0 };
+	GLfloat position[] = { 0.0, 0.0, 2.0, 1.0 };
+	GLfloat mat_diffuse[] = { 0.6, 0.6, 0.6, 1.0 };
+	GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+	GLfloat mat_shininess[] = { 50.0 };
 
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+	glLightfv(GL_LIGHT0, GL_POSITION, position);
+
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+	glMaterialfv(GL_FRONT, GL_SHININESS, mat_shininess);
+}
 
 bool Window::initializeObjects()
 {
+	//glEnable(GL_DEPTH_TEST);
+	glClearColor(0.0, 0.0, 0.0, 0.0);
 	glEnable(GL_DEPTH_TEST);
-
+	glMap2f(GL_MAP2_VERTEX_3, 0, 1, 3, 4,
+		0, 1, 12, 4, &ctrlpoints[0][0][0]);
+	glEnable(GL_MAP2_VERTEX_3);
+	glEnable(GL_AUTO_NORMAL);
+	glMapGrid2f(20, 0.0, 1.0, 20, 0.0, 1.0);
+	initlights();
 	extra = glm::mat4(1);
 	// Roller Coaster
 	rollerCoaster = new Geometry("nanosuit.obj", shader, 0, 2);
 	rollerCoaster->environmentMap = 0;
-
+/*
 	for (int loop = 0; loop < MAXX; loop++) {
 		initParticles(loop);
 	}
@@ -346,7 +481,7 @@ bool Window::initializeObjects()
 	glUniform1i(glGetUniformLocation(shaderBlur, "image"), 0);
 	glUseProgram(shaderFinal);
 	glUniform1i(glGetUniformLocation(shaderFinal, "scene"), 0);
-	glUniform1i(glGetUniformLocation(shaderFinal, "bloomBlur"), 1);
+	glUniform1i(glGetUniformLocation(shaderFinal, "bloomBlur"), 1);*/
 	return true;
 }
 
@@ -575,6 +710,15 @@ void Window::idleCallback()
 
 void Window::displayCallback(GLFWwindow* window)
 {
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glPushMatrix();
+	glRotatef(85.0, 1.0, 1.0, 1.0);
+	glEvalMesh2(GL_FILL, 0, 20, 0, 20);
+	glPopMatrix();
+	glFlush();
+
+/*
 	angle += 0.01;
 	// Clear the color and depth buffers
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -583,9 +727,10 @@ void Window::displayCallback(GLFWwindow* window)
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	rollerCoaster->draw(glm::mat4(1.0f));
-	drawRain();
-
+	//rollerCoaster->draw(glm::mat4(1.0f));
+	//drawRain();
+	//drawSides();
+	//drawSides2();
 	glm::mat4 model = glm::mat4(1.0f);
 	glUseProgram(bloom);
 	glUniform1i(glGetUniformLocation(bloom, "bloom"), bloomx);
@@ -705,7 +850,7 @@ void Window::displayCallback(GLFWwindow* window)
 	std::cout << "bloom: " << (bloom ? "on" : "off") << "| exposure: " << exposure << std::endl;
 
 	// Skybox
-	//skyBox->draw(skyShader, cubeMapTexture);
+	//skyBox->draw(skyShader, cubeMapTexture);*/
 	
 	glfwSwapBuffers(window);
 	glfwPollEvents();
