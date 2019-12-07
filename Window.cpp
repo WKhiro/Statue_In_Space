@@ -4,6 +4,8 @@
 
 using namespace irrklang;
 
+float angle = 45;
+
 unsigned int hdrFBO;
 unsigned int colorBuffers[2];
 unsigned int rboDepth;
@@ -13,6 +15,7 @@ std::vector<glm::vec3> lightPositions;
 std::vector<glm::vec3> lightColors;
 float exposure = 1.0f;
 bool bloomx = true;
+bool bloomKeyPressed = false;
 
 // Used for FPS controls
 GLFWwindow* window;
@@ -57,7 +60,6 @@ Geometry* rollerCoaster;
 glm::vec3 Window::currentPos;
 int Window::normalColoring = 0;
 
-float angle;
 int mouse = 0;
 bool raining = true;
 
@@ -228,6 +230,7 @@ unsigned int loadTexture(char const* path, bool gammaCorrection)
 		if (nrComponents == 1)
 		{
 			internalFormat = dataFormat = GL_RED;
+
 		}
 		else if (nrComponents == 3)
 		{
@@ -324,7 +327,7 @@ bool Window::initializeObjects()
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	lightPositions.push_back(glm::vec3(0.0f, 0.5f, 1.5f));
+	lightPositions.push_back(glm::vec3(10.0f, 0.5f, 1.5f));
 	lightPositions.push_back(glm::vec3(-4.0f, 0.5f, -3.0f));
 	lightPositions.push_back(glm::vec3(3.0f, 0.5f, 1.0f));
 	lightPositions.push_back(glm::vec3(-.8f, 2.4f, -1.0f));
@@ -546,11 +549,33 @@ void Window::idleCallback()
 		center = initialC;
 		up = initialU;
 	}
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !bloomKeyPressed)
+	{
+		bloomx = !bloomx;
+		bloomKeyPressed = true;
+	}
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE)
+	{
+		bloomKeyPressed = false;
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+	{
+		if (exposure > 0.0f)
+			exposure -= 0.1f;//0.001f;
+		else
+			exposure = 0.0f;
+	}
+	else if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+	{
+		exposure += 0.1f;//0.001f;
+	}
 
 }
 
 void Window::displayCallback(GLFWwindow* window)
 {
+	angle += 0.01;
 	// Clear the color and depth buffers
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -563,6 +588,7 @@ void Window::displayCallback(GLFWwindow* window)
 
 	glm::mat4 model = glm::mat4(1.0f);
 	glUseProgram(bloom);
+	glUniform1i(glGetUniformLocation(bloom, "bloom"), bloomx);
 	glUniformMatrix4fv(glGetUniformLocation(bloom, "projection"), 1, GL_FALSE, &projection[0][0]);
 	glUniformMatrix4fv(glGetUniformLocation(bloom, "view"), 1, GL_FALSE, &view[0][0]);
 
@@ -570,12 +596,17 @@ void Window::displayCallback(GLFWwindow* window)
 	glBindTexture(GL_TEXTURE_2D, wood);
 
 	// set lighting uniforms
+
+	std::string uno = "lights[";
+	std::string dos = "].Position";
+	std::string tres = "].Color";
+
 	for (unsigned int i = 0; i < lightPositions.size(); i++)
 	{
-		std::string stx = "lights[" + std::to_string(i) + "].Position";
-		const char *x = stx.c_str();
-		glUniform3fv(glGetUniformLocation(bloom, x), 1, &lightPositions[i][0]);
-		glUniform3fv(glGetUniformLocation(bloom, x), 1, &lightColors[i][0]);
+		std::string str = uno + std::to_string(i) + dos;
+		std::string str2 = uno + std::to_string(i) + tres;
+		glUniform3fv(glGetUniformLocation(bloom, str.c_str()), 1, &lightPositions[i][0]);
+		glUniform3fv(glGetUniformLocation(bloom, str2.c_str()), 1, &lightColors[i][0]);
 	}
 	glUniform3f(glGetUniformLocation(bloom, "viewPos"), eye.x, eye.y, eye.z);
 
@@ -625,7 +656,7 @@ void Window::displayCallback(GLFWwindow* window)
 	model = glm::scale(model, glm::vec3(0.5f));
 	glUniformMatrix4fv(glGetUniformLocation(bloom, "model"), 1, GL_FALSE, &model[0][0]);
 	renderCube();
-
+	
 	// finally show all the light sources as bright cubes
 	glUseProgram(shaderLight);
 	glUniformMatrix4fv(glGetUniformLocation(shaderLight, "projection"), 1, GL_FALSE, &projection[0][0]);
@@ -636,6 +667,7 @@ void Window::displayCallback(GLFWwindow* window)
 		model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(lightPositions[i]));
 		model = glm::scale(model, glm::vec3(0.25f));
+		model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
 		glUniformMatrix4fv(glGetUniformLocation(shaderLight, "model"), 1, GL_FALSE, &model[0][0]);
 		glUniform3fv(glGetUniformLocation(shaderLight, "lightColor"), 1, &lightColors[i][0]);
 		renderCube();
@@ -670,8 +702,7 @@ void Window::displayCallback(GLFWwindow* window)
 	glUniform1i(glGetUniformLocation(shaderFinal, "bloom"), bloomx);
 	glUniform1f(glGetUniformLocation(shaderFinal, "exposure"), exposure);
 	renderQuad();
-
-	//std::cout << "bloom: " << (bloom ? "on" : "off") << "| exposure: " << exposure << std::endl;
+	std::cout << "bloom: " << (bloom ? "on" : "off") << "| exposure: " << exposure << std::endl;
 
 	// Skybox
 	//skyBox->draw(skyShader, cubeMapTexture);
