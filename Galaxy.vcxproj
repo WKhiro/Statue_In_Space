@@ -107,20 +107,16 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Light.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="SceneGraph.cpp" />
+    <ClCompile Include="Geometry.cpp" />
     <ClCompile Include="shader.cpp" />
-    <ClCompile Include="SkyBox.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Light.h" />
     <ClInclude Include="main.h" />
-    <ClInclude Include="SceneGraph.h" />
+    <ClInclude Include="Geometry.h" />
     <ClInclude Include="shader.h" />
-    <ClInclude Include="SkyBox.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>

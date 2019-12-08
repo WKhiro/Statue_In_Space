@@ -23,9 +23,7 @@
 
 #include "shader.h"
 #include "stb_image.h"
-#include "SkyBox.h"
-#include "SceneGraph.h"
-#include "Light.h"
+#include "Geometry.h"
 
 class Geometry;
 
@@ -47,7 +45,6 @@ public:
 	static float Window::carT;
 	static glm::mat4 Window::roller;
 
-	static std::vector<Geometry*> sbuff;
 	static GLuint sbuffIndex;
 	static GLuint sbuffOn;
 
@@ -63,7 +60,6 @@ public:
 	static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 	static void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos);
 	static glm::vec3 trackBallMap(glm::vec2 point);
-	static unsigned int loadCubeMap(std::vector<std::string> faces);
 };
 
 #endif
