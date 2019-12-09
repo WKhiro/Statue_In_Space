@@ -40,14 +40,7 @@ public:
 
 	static glm::vec3 Window::currentPos;
 
-	static glm::vec3 Window::old_pos;
-	static glm::vec3 Window::new_pos;
-	static float Window::carT;
-	static glm::mat4 Window::roller;
-
-	static GLuint sbuffIndex;
-	static GLuint sbuffOn;
-
+	static unsigned int loadTexture(char const* path, bool gammaCorrection);
 	static bool initializeProgram();
 	static bool initializeObjects();
 	static void cleanUp();

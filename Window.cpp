@@ -23,6 +23,9 @@ float exposure = 1.0f;
 bool bloomToggle = true;
 bool bloomKeyPressed = false;
 
+glm::vec3 testerVec;
+float radian, radius, testX, testZ, angleX;
+
 int bloomShadowToggle = true;
 // Used for FPS controls
 GLFWwindow* window;
@@ -32,7 +35,6 @@ const char* window_title = "Shower Thoughts";
 
 int Window::width;
 int Window::height;
-unsigned int loadTexture(const char* path, bool gammaCorrection);
 ISoundEngine* SoundEngine = createIrrKlangDevice();
 ISoundEngine* rainEngine = createIrrKlangDevice();
 ISound* playingSound;
@@ -79,108 +81,28 @@ glm::vec3 initialU(0.0f, 1.0f, 0.0f);
 
 glm::mat4 Window::projection;
 glm::mat4 Window::view = glm::lookAt(eye, eye+center, up);
-// lighting info
-// -------------
+
 glm::vec3 lightPos;
-#define MAXX 5000
 
-// renderCube() renders a 1x1 3D cube in NDC.
-// -------------------------------------------------
-unsigned int cubeVAO = 0;
-unsigned int cubeVBO = 0;
-void renderCube()
-{
-	// initialize (if necessary)
-	if (cubeVAO == 0)
-	{
-		float vertices[] = {
-			// back face
-			-1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
-			 1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
-			 1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
-			 1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
-			-1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
-			-1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
-			// front face
-			-1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
-			 1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f, // bottom-right
-			 1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
-			 1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
-			-1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f, // top-left
-			-1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
-			// left face
-			-1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
-			-1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-left
-			-1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
-			-1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
-			-1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-right
-			-1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
-			// right face
-			 1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
-			 1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
-			 1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
-			 1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
-			 1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
-			 1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
-			// bottom face
-			-1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
-			 1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
-			 1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
-			 1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
-			-1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f, // bottom-right
-			-1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
-			// top face
-			-1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
-			 1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-			 1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
-			 1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-			-1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
-			-1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
-		};
-		glGenVertexArrays(1, &cubeVAO);
-		glGenBuffers(1, &cubeVBO);
-		// fill buffer
-		glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-		// link vertex attributes
-		glBindVertexArray(cubeVAO);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-		glEnableVertexAttribArray(2);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindVertexArray(0);
-	}
-	// render Cube
-	glBindVertexArray(cubeVAO);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-	glBindVertexArray(0);
-}
-
+#define MAXPARTICLES 5000
 
 typedef struct 
 {
-	// Life
-	bool alive;	// is the particle alive?
-	float life;	// particle lifespan
+	bool alive;
+	float lifespan;	
 	float fade; // decay
-	// color
-	float red;
-	float green;
-	float blue;
-	// Position/direction
-	float xpos;
-	float ypos;
-	float zpos;
+
+	float x;
+	float y;
+	float z;
+
 	// Velocity/Direction, only goes down in y dir
 	float vel;
 	// Gravity
 	float gravity;
 } particles;
 
-particles par_sys[MAXX];
+particles par_sys[MAXPARTICLES];
 
 bool Window::initializeProgram() 
 {
@@ -209,35 +131,36 @@ bool Window::initializeProgram()
 void initParticles(int i) 
 {
 	par_sys[i].alive = true;
-	par_sys[i].life = 5.0;
+	par_sys[i].lifespan = 5.0;
 	par_sys[i].fade = float(rand() % 100); // 1000.0f + 0.003f;
 
-	par_sys[i].xpos = (float)(rand() % 20) - (float)(rand() % 20);
-	par_sys[i].ypos = (float)(rand() % 20);
-	par_sys[i].zpos = (float)(rand() % 20) - (float)(rand() % 20);
+	par_sys[i].x = (float)(rand() % 20) - (float)(rand() % 20);
+	par_sys[i].y = (float)(rand() % 20);
+	par_sys[i].z = (float)(rand() % 20) - (float)(rand() % 20);
 
 	par_sys[i].vel = 0.0;
 	par_sys[i].gravity = -0.8;
 }
 
-void drawRain(int direction) 
+void drawParticles(int directionOfParticles)
 {
 	float x, y, z;
 	glm::mat4 model, MVP;
+
 	glUseProgram(skyShader);
 	glUniform3f(glGetUniformLocation(skyShader, "set_color"), 0.0f, 1.0f, 0.0f);
 
-	for (int i = 0; i < MAXX; i++) 
+	for (int i = 0; i < MAXPARTICLES; i++) 
 	{
 		if (par_sys[i].alive) 
 		{
-			x = par_sys[i].xpos + eye.x / 2;
-			y = par_sys[i].ypos + eye.y / 2;
-			z = par_sys[i].zpos + eye.z / 2;
+			x = par_sys[i].x + eye.x / 2;
+			y = par_sys[i].y + eye.y / 2;
+			z = par_sys[i].z + eye.z / 2;
 
 			model = glm::translate(glm::mat4(1.0f), { x, y, z });
-			glm::mat4 MVP = Window::projection * Window::view * model;
 
+			glm::mat4 MVP = Window::projection * Window::view * model;
 			glUniformMatrix4fv(glGetUniformLocation(skyShader, "MVP"), 1, GL_FALSE, &MVP[0][0]);
 
 			// Draw particles
@@ -246,29 +169,29 @@ void drawRain(int direction)
 			glEnd();
 
 			// Movement
-			if (direction)
+			if (directionOfParticles)
 			{
-				par_sys[i].ypos += par_sys[i].vel / (2.0 * 1000);
+				par_sys[i].y += par_sys[i].vel / (2.0 * 1000);
 			}
 			else
 			{
-				par_sys[i].xpos += par_sys[i].vel / (2.0 * 1000);
+				par_sys[i].x += par_sys[i].vel / (2.0 * 1000);
 			}
 
 			par_sys[i].vel += par_sys[i].gravity;
 			// Decay
-			par_sys[i].life -= par_sys[i].fade;
+			par_sys[i].lifespan -= par_sys[i].fade;
 
-			if (par_sys[i].ypos <= -10) 
+			if (par_sys[i].y <= -10) 
 			{
-				par_sys[i].life = -1.0;
+				par_sys[i].lifespan = -1.0;
 			}
 			//Revive
-			if (par_sys[i].life < 0.0 && raining) 
+			if (par_sys[i].lifespan < 0.0 && raining) 
 			{
 				initParticles(i);
 			}
-			else if (par_sys[i].life < 0.0 && !raining)
+			else if (par_sys[i].lifespan < 0.0 && !raining)
 			{
 				par_sys[i].alive = false;
 			}
@@ -280,7 +203,7 @@ void drawRain(int direction)
 	}
 }
 
-unsigned int loadTexture(char const* path, bool gammaCorrection)
+unsigned int Window::loadTexture(char const* path, bool gammaCorrection)
 {
 	unsigned int textureID;
 	glGenTextures(1, &textureID);
@@ -289,13 +212,11 @@ unsigned int loadTexture(char const* path, bool gammaCorrection)
 	unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
 	if (data)
 	{
-
 		GLenum internalFormat;
 		GLenum dataFormat;
 		if (nrComponents == 1)
 		{
 			internalFormat = dataFormat = GL_RED;
-
 		}
 		else if (nrComponents == 3)
 		{
@@ -324,7 +245,6 @@ unsigned int loadTexture(char const* path, bool gammaCorrection)
 		std::cout << "Texture failed to load at path: " << path << std::endl;
 		stbi_image_free(data);
 	}
-
 	return textureID;
 }
 
@@ -340,17 +260,6 @@ void renderScene(GLint shader)
 	model = glm::translate(model, glm::vec3(0.0f, 1.5f, 0.0));
 	model = glm::scale(model, glm::vec3(0.5f));
 	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, &model[0][0]);
-	renderCube();
-	model = glm::mat4(1.0f);
-	model = glm::translate(model, glm::vec3(2.0f, 0.0f, 1.0));
-	model = glm::scale(model, glm::vec3(0.5f));
-	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, &model[0][0]);
-	renderCube();
-	model = glm::mat4(1.0f);
-	model = glm::translate(model, glm::vec3(-1.0f, 0.0f, 2.0));
-	model = glm::rotate(model, glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
-	model = glm::scale(model, glm::vec3(0.25));
-	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, &model[0][0]);
 	renderCube();*/
 }
 
@@ -358,15 +267,16 @@ void renderScene(GLint shader)
 bool Window::initializeObjects()
 {
 	glEnable(GL_DEPTH_TEST);
-	lightPos = glm::vec3(-2.0f, 4.0f, -1.0f);
+	lightPos = glm::vec3(4.0, 3.0f, 3.0);
 
-	// Roller Coaster
 	suit = new Geometry("nanosuit.obj");
 	planet = new Geometry("planet.obj");
 
-	for (int i = 0; i < MAXX; i++) {
+	for (int i = 0; i < MAXPARTICLES; i++) 
+	{
 		initParticles(i);
 	}
+
 	float planeVertices[] = {
 		// positions            // normals         // texcoords
 		 25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
@@ -464,10 +374,14 @@ bool Window::initializeObjects()
 	glUseProgram(shadowDebug);
 	glUniform1i(glGetUniformLocation(shadowDebug, "depthMap"), 0);
 
-	lightPositions.push_back(glm::vec3(15.0f, 0.5f, -10.5f));
-	lightPositions.push_back(glm::vec3(15.0f, 0.5f, 10.5f));
-	lightPositions.push_back(glm::vec3(-15.0f, 0.5f, 10.5f));
-	lightPositions.push_back(glm::vec3(-15.0f, 0.5f, -10.5f));
+	testerVec = glm::vec3(0.0f, 0.0f, 0.0f);
+	lightPositions.push_back(glm::vec3(3.0f, 10.0f, 1.0f));
+	lightPositions.push_back(glm::vec3(1.0f, 10.0f, 1.0f));
+
+	//lightPositions.push_back(glm::vec3(3.0f, 10.0f, 1.0f));
+	//lightPositions.push_back(glm::vec3(testX, 0, testZ));
+	//lightPositions.push_back(glm::vec3(-3.0f, 6.0f, 0.0f));
+	//lightPositions.push_back(glm::vec3(3.0f, 12.0f, -1.0f));
 	// colors
 	lightColors.push_back(glm::vec3(5.0f, 5.0f, 5.0f));
 	lightColors.push_back(glm::vec3(10.0f, 0.0f, 0.0f));
@@ -638,7 +552,40 @@ void Window::idleCallback()
 
 void Window::displayCallback(GLFWwindow* window)
 {
+	angleX += 1.0f;
+
+	if (angleX > 360.0f)
+	{
+		angleX = 0.0f;
+	}
+
+	radian = glm::radians(angleX);
+
+	radius = 5.0f;
+
+	testX = 0.0 + (radius * cosf(radian));
+	testZ = 0.0 + (radius * sinf(radian));
+
+	testerVec = glm::vec3(0.0, 2.0f, 2.0);
 	glm::mat4 model = glm::mat4(1.0f);
+
+	lightPositions.clear();
+	lightPositions.push_back(testerVec);
+
+	radius = 4.0f;
+	testX = 0.0 + (radius * cosf(radian));
+	testZ = 0.0 + (radius * sinf(radian));
+
+	testerVec = glm::vec3(testX, 12.0f, testZ);
+	lightPositions.push_back(testerVec);
+
+	radius = 4.0f;
+	testX = 0.0 + (radius * cosf(radian));
+	testZ = 0.0 + (radius * sinf(radian));
+
+	testerVec = glm::vec3(testX, 8.0f, testZ);
+	lightPositions.push_back(testerVec);
+
 	angle += 1;
 	if (bloomShadowToggle)
 	{
@@ -650,14 +597,15 @@ void Window::displayCallback(GLFWwindow* window)
 		glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		drawRain(1);
-		drawRain(0);
+		drawParticles(0);
+		drawParticles(1);
 
 		glUseProgram(bloom);
 		glUniformMatrix4fv(glGetUniformLocation(bloom, "projection"), 1, GL_FALSE, &projection[0][0]);
 		glUniformMatrix4fv(glGetUniformLocation(bloom, "view"), 1, GL_FALSE, &view[0][0]);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, wood);
+		suit->draw(glm::mat4(1), bloom);
 
 		// Setup for lighting uniforms
 		for (int i = 0; i < lightPositions.size(); i++)
@@ -680,7 +628,7 @@ void Window::displayCallback(GLFWwindow* window)
 		{
 			model = glm::mat4(1.0f);
 			model = glm::translate(model, glm::vec3(lightPositions[i]));
-			model = glm::scale(model, glm::vec3(1.0f));
+			model = glm::scale(model, glm::vec3(0.1f));
 			model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
 			glUniformMatrix4fv(glGetUniformLocation(shaderLight, "model"), 1, GL_FALSE, &model[0][0]);
 			glUniform3fv(glGetUniformLocation(shaderLight, "lightColor"), 1, &lightColors[i][0]);
@@ -745,11 +693,11 @@ void Window::displayCallback(GLFWwindow* window)
 	renderScene(shadowDepth);
 
 	suit->draw(glm::mat4(1.0f), shadowDepth);
-	for (int i = 0; i < lightPositions.size(); i++)
+	for (int i = 0; i < 1; i++)
 	{
 		model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(lightPositions[i]));
-		model = glm::scale(model, glm::vec3(1.0f));
+		model = glm::scale(model, glm::vec3(0.5f));
 		model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
 		planet->draw(model, shadowDepth);
 	}
@@ -777,11 +725,11 @@ void Window::displayCallback(GLFWwindow* window)
 	renderScene(shadow);
 	suit->draw(glm::mat4(1.0f), shadow);
 
-	for (int i = 0; i < lightPositions.size(); i++)
+	for (int i = 0; i < 1; i++)
 	{
 		model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(lightPositions[i]));
-		model = glm::scale(model, glm::vec3(1.0f));
+		model = glm::scale(model, glm::vec3(0.5f));
 		model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
 		planet->draw(model, shadow);
 	}
@@ -796,8 +744,8 @@ void Window::displayCallback(GLFWwindow* window)
 	glViewport(width * 0.8, 0, width * 0.2, height * 0.2);
 	renderQuad();
 	glViewport(0, 0, width, height);
-	drawRain(1);
-	drawRain(0);
+	drawParticles(0);
+	drawParticles(1);
 	}
 
 	glfwSwapBuffers(window);

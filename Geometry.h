@@ -26,7 +26,6 @@ private:
 	std::vector<float> normals;
 	std::vector<float> textures;
 
-	GLuint shader;
 	GLuint sphereVBO, sphereVBO2, sphereVBO3, sphereVAO, sphereEBO;
 
 public:
