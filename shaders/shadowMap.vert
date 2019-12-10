@@ -5,7 +5,8 @@ layout (location = 2) in vec2 aTexCoords;
 
 out vec2 TexCoords;
 
-out VS_OUT {
+out VS_OUT 
+{
     vec3 FragPos;
     vec3 Normal;
     vec2 TexCoords;

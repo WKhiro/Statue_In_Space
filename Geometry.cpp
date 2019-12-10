@@ -6,31 +6,31 @@ Geometry::Geometry(std::string objFilename)
 	// Parse the spheres
 	parse(objFilename);
 
-	glGenVertexArrays(1, &sphereVAO);
+	glGenVertexArrays(1, &geometryVAO);
 
-	glGenBuffers(1, &sphereVBO);
-	glGenBuffers(1, &sphereVBO2);
-	glGenBuffers(1, &sphereVBO3);
-	glGenBuffers(1, &sphereEBO);
+	glGenBuffers(1, &geometryVBO);
+	glGenBuffers(1, &geometryVBO2);
+	glGenBuffers(1, &geometryVBO3);
+	glGenBuffers(1, &geometryEBO);
 
-	glBindVertexArray(sphereVAO);
+	glBindVertexArray(geometryVAO);
 
-	glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, geometryVBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*vertices.size(), vertices.data(), GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
-	glBindBuffer(GL_ARRAY_BUFFER, sphereVBO2);
+	glBindBuffer(GL_ARRAY_BUFFER, geometryVBO2);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*normals.size(), normals.data(), GL_STATIC_DRAW);
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_TRUE, 3 * sizeof(GLfloat), (GLvoid*)0);
 
-	glBindBuffer(GL_ARRAY_BUFFER, sphereVBO3);
+	glBindBuffer(GL_ARRAY_BUFFER, geometryVBO3);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * textures.size(), textures.data(), GL_STATIC_DRAW);
 	glEnableVertexAttribArray(2);
 	glVertexAttribPointer(2, 3, GL_FLOAT, GL_TRUE, 3 * sizeof(GLfloat), (GLvoid*)0);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereEBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, geometryEBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)*indices.size(), &indices[0], GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -39,10 +39,10 @@ Geometry::Geometry(std::string objFilename)
 
 Geometry::~Geometry()
 {
-	glDeleteVertexArrays(1, &sphereVAO);
-	glDeleteBuffers(1, &sphereVBO);
-	glDeleteBuffers(1, &sphereVBO2);
-	glDeleteBuffers(1, &sphereEBO);
+	glDeleteVertexArrays(1, &geometryVAO);
+	glDeleteBuffers(1, &geometryVBO);
+	glDeleteBuffers(1, &geometryVBO2);
+	glDeleteBuffers(1, &geometryEBO);
 }
 
 void Geometry::parse(std::string objFilename)
@@ -148,7 +148,7 @@ void Geometry::draw(glm::mat4 model, GLuint shader)
 {
 	glUseProgram(shader);
 	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, &model[0][0]);
-	glBindVertexArray(sphereVAO);
+	glBindVertexArray(geometryVAO);
 	glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 }

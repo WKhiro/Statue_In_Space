@@ -26,7 +26,7 @@ private:
 	std::vector<float> normals;
 	std::vector<float> textures;
 
-	GLuint sphereVBO, sphereVBO2, sphereVBO3, sphereVAO, sphereEBO;
+	GLuint geometryVBO, geometryVBO2, geometryVBO3, geometryVAO, geometryEBO;
 
 public:
 	Geometry(std::string objFilename);

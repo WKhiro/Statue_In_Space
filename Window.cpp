@@ -240,7 +240,7 @@ void Window::renderQuad()
 
 bool Window::initializeProgram() 
 {
-	metal = loadTexture("metal.png", true);
+	metal = loadTexture("textures/metal.png", true);
 	playingSound = StarEngine->play2D("audio/rain.mp3", true, false, true);
 	starShader = LoadShaders("shaders/stars.vert", "shaders/stars.frag");
 
@@ -304,8 +304,8 @@ bool Window::initializeObjects()
 	// Default light position
 	lightPos = glm::vec3(4.0f, 3.0f, 3.0f);
 
-	suit = new Geometry("nanosuit.obj");
-	planet = new Geometry("planet.obj");
+	suit = new Geometry("objects/nanosuit.obj");
+	planet = new Geometry("objects/planet.obj");
 
 	for (int i = 0; i < MAXPARTICLES; i++) 
 	{
