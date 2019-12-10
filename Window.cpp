@@ -4,204 +4,94 @@
 
 using namespace irrklang;
 
-const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
-unsigned int depthMapFBO;
-unsigned int depthMap;
-unsigned int planeVAO;
+#define MAXPARTICLES 5000
 
-
-float angle = 45;
-
-unsigned int hdrFBO;
-unsigned int colorBuffers[2];
-unsigned int rboDepth;
-unsigned int pingpongFBO[2];
-unsigned int pingpongColorbuffers[2];
-std::vector<glm::vec3> lightPositions;
-std::vector<glm::vec3> lightColors;
-float exposure = 1.0f;
-bool bloomToggle = true;
-bool bloomKeyPressed = false;
-
-glm::vec3 testerVec;
-float radian, radius, testX, testZ, angleX;
-
-int bloomShadowToggle = true;
-// Used for FPS controls
+const char* window_title = "Statue in Space";
 GLFWwindow* window;
-glm::mat4 extra;
+int Window::width, Window::height;
 
-const char* window_title = "Shower Thoughts";
+typedef struct
+{
+	bool alive;
+	float lifespan, fade, velocity, gravity;
+	float x, y, z;
+} particles;
 
-int Window::width;
-int Window::height;
-ISoundEngine* SoundEngine = createIrrKlangDevice();
-ISoundEngine* rainEngine = createIrrKlangDevice();
-ISound* playingSound;
+particles starSystem[MAXPARTICLES];
 
-double Window::oldX = 0;
-double Window::oldY = 0;
+float floorVertices[] =
+{
+	// Positions          // Normals         // Texture coordinates
+	10.0f, 0.0f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
+   -10.0f, 0.0f,  10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
+   -10.0f, 0.0f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
 
-bool firstMouse;
-bool movement = false;
-double fov = 90.0f;
-float yaw = -90.0f;
-float pitch = 0.0f;
+	10.0f, 0.0f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
+   -10.0f, 0.0f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
+	10.0f, 0.0f, -10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f
+};
+
+float quadVertices[] =
+{
+	// Positions         // Texture coordinates
+	-1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
+	-1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+	 1.0f,  1.0f, 0.0f,  1.0f, 1.0f,
+	 1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+};
+
+const unsigned int shadowWidth = 1024, shadowHeight = 1024;
+
+unsigned int floorVAO, floorVBO, quadVAO, quadVBO,
+depthMapFBO, depthMap, hdrFBO, colorBuffers[2], rboDepth,
+pingpongFBO[2], pingpongColorbuffers[2];
+
+glm::vec3 lightPos, orbitCoordinates;
+
+std::vector<glm::vec3> lightPositions, lightColors;
+
+bool bloomToggle = true, bloomShadowToggle = true,
+bloomKeyPressed = false, lightMovement = false,
+firstMouse = false, movement = false,
+shadowToggle = true, starsToggle = true;
+
+float angle, radian, radius, 
+orbitX, orbitY, orbitZ,
+exposure = 1.0f, 
+yaw = -90.0f, pitch = 0.0f;
+
+double Window::oldX = 0.0f, Window::oldY = 0.0f, 
+fov = 90.0f;
 
 // Shaders 
-GLint shader;
-GLint skyShader;
-GLint selection;
-GLint environment;
-GLint bloom;
-GLint shaderLight;
-GLint shaderBlur;
-GLint shaderFinal;
-GLint shadow;
-GLint shadowDepth;
-GLint shadowDebug;
-GLuint vao, vbo;
-unsigned int wood;
+GLint starShader, 
+shadow, shadowDepth, shadowDebug,
+bloom, shaderLight, shaderBlur, shaderFinal;
 
+// Sound
+ISoundEngine* SoundEngine = createIrrKlangDevice();
+ISoundEngine* StarEngine = createIrrKlangDevice();
+ISound* playingSound;
+
+// Textures
+unsigned int metal;
+
+// Models
 Geometry* suit;
 Geometry* planet;
-glm::vec3 Window::currentPos;
-int Window::normalColoring = 0;
 
-int mouse = 0;
-bool raining = true;
-
-glm::vec3 eye(0, 0, 5);
-glm::vec3 center(0, 0, -1);
+// Camera coordinates
+glm::vec3 eye(0.0f, 7.0f, 15.0f);
+glm::vec3 center(0.0f, 0.0f, -1.0f);
 glm::vec3 up(0.0f, 1.0f, 0.0f);
 
-glm::vec3 initialE(0, 0, 5);
-glm::vec3 initialC(0, 0, -1);
+// Used to reset camera
+glm::vec3 initialE(0.0f, 7.0f, 15.0f);
+glm::vec3 initialC(0.0f, 0.0f, -1.0f);
 glm::vec3 initialU(0.0f, 1.0f, 0.0f);
 
 glm::mat4 Window::projection;
-glm::mat4 Window::view = glm::lookAt(eye, eye+center, up);
-
-glm::vec3 lightPos;
-
-#define MAXPARTICLES 5000
-
-typedef struct 
-{
-	bool alive;
-	float lifespan;	
-	float fade; // decay
-
-	float x;
-	float y;
-	float z;
-
-	// Velocity/Direction, only goes down in y dir
-	float vel;
-	// Gravity
-	float gravity;
-} particles;
-
-particles par_sys[MAXPARTICLES];
-
-bool Window::initializeProgram() 
-{
-	wood = loadTexture("wood.png", true); // note that we're loading the texture as an SRGB texture
-	playingSound = rainEngine->play2D("audio/rain.mp3", true, false, true);
-	skyShader = LoadShaders("shaders/toon.vert", "shaders/toon.frag");
-
-	shadow = LoadShaders("shaders/shadowMap.vert", "shaders/shadowMap.frag");
-	shadowDepth = LoadShaders("shaders/shadowDepth.vert", "shaders/shadowDepth.frag");
-	shadowDebug = LoadShaders("shaders/debug.vert", "shaders/debug.frag");
-
-	bloom = LoadShaders("shaders/bloom.vert", "shaders/bloom.frag");
-	shaderLight = LoadShaders("shaders/bloom.vert", "shaders/lightBox.frag");
-	shaderBlur = LoadShaders("shaders/blur.vert", "shaders/blur.frag");
-	shaderFinal = LoadShaders("shaders/bloomFinal.vert", "shaders/bloomFinal.frag");
-
-	if (!skyShader)
-	{
-		std::cerr << "Failed to initialize shader program (skyShader.frag/skyShader.vert)" << std::endl;
-		return false;
-	}
-
-	return true;
-}
-
-void initParticles(int i) 
-{
-	par_sys[i].alive = true;
-	par_sys[i].lifespan = 5.0;
-	par_sys[i].fade = float(rand() % 100); // 1000.0f + 0.003f;
-
-	par_sys[i].x = (float)(rand() % 20) - (float)(rand() % 20);
-	par_sys[i].y = (float)(rand() % 20);
-	par_sys[i].z = (float)(rand() % 20) - (float)(rand() % 20);
-
-	par_sys[i].vel = 0.0;
-	par_sys[i].gravity = -0.8;
-}
-
-void drawParticles(int directionOfParticles)
-{
-	float x, y, z;
-	glm::mat4 model, MVP;
-
-	glUseProgram(skyShader);
-	glUniform3f(glGetUniformLocation(skyShader, "set_color"), 0.0f, 1.0f, 0.0f);
-
-	for (int i = 0; i < MAXPARTICLES; i++) 
-	{
-		if (par_sys[i].alive) 
-		{
-			x = par_sys[i].x + eye.x / 2;
-			y = par_sys[i].y + eye.y / 2;
-			z = par_sys[i].z + eye.z / 2;
-
-			model = glm::translate(glm::mat4(1.0f), { x, y, z });
-
-			glm::mat4 MVP = Window::projection * Window::view * model;
-			glUniformMatrix4fv(glGetUniformLocation(skyShader, "MVP"), 1, GL_FALSE, &MVP[0][0]);
-
-			// Draw particles
-			glBegin(GL_POINTS);
-			glVertex3f(x, y, z);
-			glEnd();
-
-			// Movement
-			if (directionOfParticles)
-			{
-				par_sys[i].y += par_sys[i].vel / (2.0 * 1000);
-			}
-			else
-			{
-				par_sys[i].x += par_sys[i].vel / (2.0 * 1000);
-			}
-
-			par_sys[i].vel += par_sys[i].gravity;
-			// Decay
-			par_sys[i].lifespan -= par_sys[i].fade;
-
-			if (par_sys[i].y <= -10) 
-			{
-				par_sys[i].lifespan = -1.0;
-			}
-			//Revive
-			if (par_sys[i].lifespan < 0.0 && raining) 
-			{
-				initParticles(i);
-			}
-			else if (par_sys[i].lifespan < 0.0 && !raining)
-			{
-				par_sys[i].alive = false;
-			}
-		}
-		else if (par_sys[i].alive == false && raining)
-		{
-				initParticles(i);
-		}
-	}
-}
+glm::mat4 Window::view = glm::lookAt(eye, eye + center, up);
 
 unsigned int Window::loadTexture(char const* path, bool gammaCorrection)
 {
@@ -248,26 +138,171 @@ unsigned int Window::loadTexture(char const* path, bool gammaCorrection)
 	return textureID;
 }
 
-void renderScene(GLint shader)
+void Window::initParticles(int i)
 {
-	// floor
-	glm::mat4 model = glm::mat4(1.0f);
-	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, &model[0][0]);
-	glBindVertexArray(planeVAO);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-	/*// cubes
-	model = glm::mat4(1.0f);
-	model = glm::translate(model, glm::vec3(0.0f, 1.5f, 0.0));
-	model = glm::scale(model, glm::vec3(0.5f));
-	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, &model[0][0]);
-	renderCube();*/
+	starSystem[i].alive = true;
+	starSystem[i].lifespan = 5.0;
+	starSystem[i].fade = float(rand() % 100);
+
+	starSystem[i].x = (float)(rand() % 20) - (float)(rand() % 20);
+	starSystem[i].y = (float)(rand() % 20);
+	starSystem[i].z = (float)(rand() % 20) - (float)(rand() % 20);
+
+	starSystem[i].velocity = 0.0;
+	starSystem[i].gravity = -0.8;
 }
 
+void Window::drawParticles(int directionOfParticles)
+{
+	float x, y, z;
+	glm::mat4 model, MVP;
+
+	glUseProgram(starShader);
+	glUniform3f(glGetUniformLocation(starShader, "set_color"), 0.0f, 1.0f, 0.0f);
+
+	for (int i = 0; i < MAXPARTICLES; i++)
+	{
+		if (starSystem[i].alive)
+		{
+			x = starSystem[i].x + eye.x / 2;
+			y = starSystem[i].y + eye.y / 2;
+			z = starSystem[i].z + eye.z / 2;
+
+			model = glm::translate(glm::mat4(1.0f), { x, y, z });
+			MVP = Window::projection * Window::view * model;
+
+			glUniformMatrix4fv(glGetUniformLocation(starShader, "MVP"), 1, GL_FALSE, &MVP[0][0]);
+
+			// Draw particles
+			glBegin(GL_POINTS);
+			glVertex3f(x, y, z);
+			glEnd();
+
+			// Direction of movement
+			if (directionOfParticles)
+			{
+				starSystem[i].y += starSystem[i].velocity / (2.0 * 1000);
+			}
+			else
+			{
+				starSystem[i].x += starSystem[i].velocity / (2.0 * 1000);
+			}
+
+			// Speed and lifespan
+			starSystem[i].velocity += starSystem[i].gravity;
+			starSystem[i].lifespan -= starSystem[i].fade;
+
+			if (starSystem[i].y <= -10)
+			{
+				starSystem[i].lifespan = -1.0;
+			}
+
+			// Bring back the particles if they're turned on
+			if (starSystem[i].lifespan < 0.0 && starsToggle)
+			{
+				initParticles(i);
+			}
+			else if (starSystem[i].lifespan < 0.0 && !starsToggle)
+			{
+				starSystem[i].alive = false;
+			}
+		}
+		else if (starSystem[i].alive == false && starsToggle)
+		{
+			initParticles(i);
+		}
+	}
+}
+
+void Window::renderFloor(GLint shader)
+{
+	glm::mat4 model = glm::mat4(1.0f);
+	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, &model[0][0]);
+	glBindVertexArray(floorVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+void Window::renderQuad()
+{
+	glGenVertexArrays(1, &quadVAO);
+	glGenBuffers(1, &quadVBO);
+	glBindVertexArray(quadVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glBindVertexArray(quadVAO);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glBindVertexArray(0);
+}
+
+bool Window::initializeProgram() 
+{
+	metal = loadTexture("metal.png", true);
+	playingSound = StarEngine->play2D("audio/rain.mp3", true, false, true);
+	starShader = LoadShaders("shaders/stars.vert", "shaders/stars.frag");
+
+	shadow = LoadShaders("shaders/shadowMap.vert", "shaders/shadowMap.frag");
+	shadowDepth = LoadShaders("shaders/shadowDepth.vert", "shaders/shadowDepth.frag");
+	shadowDebug = LoadShaders("shaders/debug.vert", "shaders/debug.frag");
+
+	bloom = LoadShaders("shaders/bloom.vert", "shaders/bloom.frag");
+	shaderLight = LoadShaders("shaders/bloom.vert", "shaders/lightBox.frag");
+	shaderBlur = LoadShaders("shaders/blur.vert", "shaders/blur.frag");
+	shaderFinal = LoadShaders("shaders/bloomFinal.vert", "shaders/bloomFinal.frag");
+	
+	if (!starShader)
+	{
+		std::cerr << "Failed to initialize shader program (starShader.frag/starShader.vert)" << std::endl;
+		return false;
+	}
+	if (!shadow)
+	{
+		std::cerr << "Failed to initialize shader program (shadowMap.frag/shadowMap.vert)" << std::endl;
+		return false;
+	}
+	if (!shadowDepth)
+	{
+		std::cerr << "Failed to initialize shader program (shadowDepth.frag/shadowDepth.vert)" << std::endl;
+		return false;
+	}
+	if (!shadowDebug)
+	{
+		std::cerr << "Failed to initialize shader program (debug.frag/debug.vert)" << std::endl;
+		return false;
+	}
+	if (!bloom)
+	{
+		std::cerr << "Failed to initialize shader program (bloom.frag/bloom.vert)" << std::endl;
+		return false;
+	}
+	if (!shaderLight)
+	{
+		std::cerr << "Failed to initialize shader program (lightBox.frag/bloom.vert)" << std::endl;
+		return false;
+	}
+	if (!shaderBlur)
+	{
+		std::cerr << "Failed to initialize shader program (blur.frag/blur.vert)" << std::endl;
+		return false;
+	}
+	if (!shaderFinal)
+	{
+		std::cerr << "Failed to initialize shader program (bloomFinal.frag/bloomFinal.vert)" << std::endl;
+		return false;
+	}
+
+	return true;
+}
 
 bool Window::initializeObjects()
 {
 	glEnable(GL_DEPTH_TEST);
-	lightPos = glm::vec3(4.0, 3.0f, 3.0);
+
+	// Default light position
+	lightPos = glm::vec3(4.0f, 3.0f, 3.0f);
 
 	suit = new Geometry("nanosuit.obj");
 	planet = new Geometry("planet.obj");
@@ -277,22 +312,12 @@ bool Window::initializeObjects()
 		initParticles(i);
 	}
 
-	float planeVertices[] = {
-		// positions            // normals         // texcoords
-		 25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-		-25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
-		-25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
-
-		 25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-		-25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
-		 25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,  25.0f, 25.0f
-	};
-	unsigned int planeVBO;
-	glGenVertexArrays(1, &planeVAO);
-	glGenBuffers(1, &planeVBO);
-	glBindVertexArray(planeVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
+	// Generate buffer for floor
+	glGenVertexArrays(1, &floorVAO);
+	glGenBuffers(1, &floorVBO);
+	glBindVertexArray(floorVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, floorVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(floorVertices), floorVertices, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(1);
@@ -301,27 +326,27 @@ bool Window::initializeObjects()
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glBindVertexArray(0);
 
+	// Depth map for shadows
 	glGenFramebuffers(1, &depthMapFBO);
-	// create depth texture
 	glGenTextures(1, &depthMap);
 	glBindTexture(GL_TEXTURE_2D, depthMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadowWidth, shadowHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 	float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
 	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-	// attach depth texture as FBO's depth buffer
 	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	// Bloom setup
 	glGenFramebuffers(1, &hdrFBO);
 	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-	// create 2 floating point color buffers (1 for normal rendering, other for brightness treshold values)
+	// Create 2 float color buffers (normal rendering / brightness threshold values)
 	glGenTextures(2, colorBuffers);
 	for (unsigned int i = 0; i < 2; i++)
 	{
@@ -329,25 +354,26 @@ bool Window::initializeObjects()
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);  // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		// attach texture to framebuffer
+		// Attach texture
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, colorBuffers[i], 0);
 	}
-	// create and attach depth buffer (renderbuffer)
+
+	// Attach depth buffer
 	glGenRenderbuffers(1, &rboDepth);
 	glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
-	// tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
 	unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 	glDrawBuffers(2, attachments);
-	// finally check if framebuffer is complete
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	{
 		std::cout << "Framebuffer not complete!" << std::endl;
+	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// ping-pong-framebuffer for blurring
+	// Ping-pong FBO for blur
 	glGenFramebuffers(2, pingpongFBO);
 	glGenTextures(2, pingpongColorbuffers);
 	for (unsigned int i = 0; i < 2; i++)
@@ -357,39 +383,17 @@ bool Window::initializeObjects()
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
-		// also check if framebuffers are complete (no need for depth buffer)
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		{
 			std::cout << "Framebuffer not complete!" << std::endl;
+		}
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// shader configuration
-// --------------------
-	glUseProgram(shadow);
-	glUniform1i(glGetUniformLocation(shadow, "diffuseTexture"), 0);
-	glUniform1i(glGetUniformLocation(shadow, "shadowMap"), 1);
-	glUseProgram(shadowDebug);
-	glUniform1i(glGetUniformLocation(shadowDebug, "depthMap"), 0);
-
-	testerVec = glm::vec3(0.0f, 0.0f, 0.0f);
-	lightPositions.push_back(glm::vec3(3.0f, 10.0f, 1.0f));
-	lightPositions.push_back(glm::vec3(1.0f, 10.0f, 1.0f));
-
-	//lightPositions.push_back(glm::vec3(3.0f, 10.0f, 1.0f));
-	//lightPositions.push_back(glm::vec3(testX, 0, testZ));
-	//lightPositions.push_back(glm::vec3(-3.0f, 6.0f, 0.0f));
-	//lightPositions.push_back(glm::vec3(3.0f, 12.0f, -1.0f));
-	// colors
-	lightColors.push_back(glm::vec3(5.0f, 5.0f, 5.0f));
-	lightColors.push_back(glm::vec3(10.0f, 0.0f, 0.0f));
-	lightColors.push_back(glm::vec3(0.0f, 0.0f, 15.0f));
-	lightColors.push_back(glm::vec3(0.0f, 5.0f, 0.0f));
-
-	// shader configuration
-	// --------------------
+	// Configure bloom shaders
 	glUseProgram(bloom);
 	glUniform1i(glGetUniformLocation(bloom, "diffuseTexture"), 0);
 	glUseProgram(shaderBlur);
@@ -397,49 +401,41 @@ bool Window::initializeObjects()
 	glUseProgram(shaderFinal);
 	glUniform1i(glGetUniformLocation(shaderFinal, "scene"), 0);
 	glUniform1i(glGetUniformLocation(shaderFinal, "bloomBlur"), 1);
+
+	// Configure shadow shaders
+	glUseProgram(shadow);
+	glUniform1i(glGetUniformLocation(shadow, "diffuseTexture"), 0);
+	glUniform1i(glGetUniformLocation(shadow, "shadowMap"), 1);
+	glUseProgram(shadowDebug);
+	glUniform1i(glGetUniformLocation(shadowDebug, "depthMap"), 0);
+
+	// Set orb colors
+	lightColors.push_back(glm::vec3(5.0f, 5.0f, 5.0f));
+	lightColors.push_back(glm::vec3(5.0f, 0.0f, 0.0f));
+	lightColors.push_back(glm::vec3(5.0f, 2.0f, 0.0f));
+	lightColors.push_back(glm::vec3(0.0f, 5.0f, 0.0f));
+	lightColors.push_back(glm::vec3(5.0f, 5.0f, 0.0f));
+	lightColors.push_back(glm::vec3(0.0f, 5.0f, 5.0f));
+	lightColors.push_back(glm::vec3(5.0f, 0.0f, 5.0f));
+
 	return true;
 }
-
-// renderQuad() renders a 1x1 XY quad in NDC
-// -----------------------------------------
-unsigned int quadVAO = 0;
-unsigned int quadVBO;
-void renderQuad()
-{
-	if (quadVAO == 0)
-	{
-		float quadVertices[] = {
-			// positions        // texture Coords
-			-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-			-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-			 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-			 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-		};
-		// setup plane VAO
-		glGenVertexArrays(1, &quadVAO);
-		glGenBuffers(1, &quadVBO);
-		glBindVertexArray(quadVAO);
-		glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-	}
-	glBindVertexArray(quadVAO);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	glBindVertexArray(0);
-}
-
 
 // Treat this as a destructor function. Delete dynamically allocated memory here.
 void Window::cleanUp()
 {
-	glDeleteProgram(shader);
-	glDeleteProgram(skyShader);
-	glDeleteProgram(environment);
+	glDeleteProgram(starShader);
+	glDeleteProgram(shadow);
+	glDeleteProgram(shadowDepth);
+	glDeleteProgram(shadowDebug);
+	glDeleteProgram(bloom);
+	glDeleteProgram(shaderLight);
+	glDeleteProgram(shaderBlur);
+	glDeleteProgram(shaderFinal);
+	suit->~Geometry();
+	planet->~Geometry();
 	SoundEngine->drop();
-	rainEngine->drop();
+	StarEngine->drop();
 }
 
 GLFWwindow* Window::createWindow(int width, int height)
@@ -510,22 +506,66 @@ void Window::idleCallback()
 	Window::projection = glm::perspective(glm::radians(fov),
 		double(width) / (double)height, 1.0, 1000.0);
 	Window::view = glm::lookAt(eye, eye + center, up);
+
+	// FPS movement controls / lighting controls
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 	{
-		eye += center * 0.05f;
+		if (lightMovement && !bloomShadowToggle)
+		{
+			lightPos.y += 0.05;
+		}
+		else
+		{
+			eye += center * 0.1f;
+		}
 	}
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 	{
-		eye -= center * 0.05f;
+		if (lightMovement && !bloomShadowToggle)
+		{
+			lightPos.y -= 0.05;
+		}
+		else
+		{
+			eye -= center * 0.1f;
+		}
 	}
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 	{
-		eye -= glm::normalize(glm::cross(center, up)) * 0.05f;
+		if (lightMovement && !bloomShadowToggle)
+		{
+			lightPos.x -= 0.05;
+		}
+		else
+		{
+			eye -= glm::normalize(glm::cross(center, up)) * 0.1f;
+		}
 	}
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 	{
-		eye += glm::normalize(glm::cross(center, up)) * 0.05f;
+		if (lightMovement && !bloomShadowToggle)
+		{
+			lightPos.x += 0.05;
+		}
+		else
+		{
+			eye += glm::normalize(glm::cross(center, up)) * 0.1f;
+		}
 	}
+
+	if (lightMovement && !bloomShadowToggle)
+	{
+		if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+		{
+			lightPos.z -= 0.05;
+		}
+		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+		{
+			lightPos.z += 0.05;
+		}
+	}
+
+	// Resets camera view
 	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
 	{
 		eye = initialE;
@@ -533,60 +573,96 @@ void Window::idleCallback()
 		up = initialU;
 	}
 
-	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+	// Exposure for bloom
+	if (bloomShadowToggle)
 	{
-		if (exposure > 0.0f)
+		if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS)
 		{
-			exposure -= 0.1f;
+			if (exposure > 0.0f)
+			{
+				exposure -= 0.1f;
+			}
+			else
+			{
+				exposure = 0.0f;
+			}
 		}
-		else
+		if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
 		{
-			exposure = 0.0f;
+			exposure += 0.1f;
 		}
-	}
-	else if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-	{
-		exposure += 0.1f;
 	}
 }
 
 void Window::displayCallback(GLFWwindow* window)
 {
-	angleX += 1.0f;
-
-	if (angleX > 360.0f)
-	{
-		angleX = 0.0f;
-	}
-
-	radian = glm::radians(angleX);
-
-	radius = 5.0f;
-
-	testX = 0.0 + (radius * cosf(radian));
-	testZ = 0.0 + (radius * sinf(radian));
-
-	testerVec = glm::vec3(0.0, 2.0f, 2.0);
 	glm::mat4 model = glm::mat4(1.0f);
 
+	// Reset the light positions
 	lightPositions.clear();
-	lightPositions.push_back(testerVec);
 
-	radius = 4.0f;
-	testX = 0.0 + (radius * cosf(radian));
-	testZ = 0.0 + (radius * sinf(radian));
+	// Increment angle for orbiting
+	angle += 1.0f;
 
-	testerVec = glm::vec3(testX, 12.0f, testZ);
-	lightPositions.push_back(testerVec);
+	if (angle > 360.0f)
+	{
+		angle = 0.0f;
+	}
+	radian = glm::radians(angle);
 
-	radius = 4.0f;
-	testX = 0.0 + (radius * cosf(radian));
-	testZ = 0.0 + (radius * sinf(radian));
+	// Calculate orbit for all orbs
+	radius = 0.1f;
+	orbitX = (radius * cosf(radian));
+	orbitY = 1.0f;
+	orbitZ = 4.0f + (radius * sinf(radian));
 
-	testerVec = glm::vec3(testX, 8.0f, testZ);
-	lightPositions.push_back(testerVec);
+	orbitCoordinates = glm::vec3(orbitX, orbitY, orbitZ);
+	lightPositions.push_back(orbitCoordinates);
 
-	angle += 1;
+	radius = 3.0f;
+	orbitX = (radius * cosf(radian));
+	orbitY = 12.0f;
+	orbitZ = (radius * sinf(radian));
+
+	orbitCoordinates = glm::vec3(orbitX, orbitY, orbitZ);
+	lightPositions.push_back(orbitCoordinates);
+
+	radius = 2.0f;
+	orbitX = (radius * cosf(radian)) * -1.0f;
+	orbitY = 14.0f;
+	orbitZ = (radius * sinf(radian)) * -1.0f;
+
+	orbitCoordinates = glm::vec3(orbitX, orbitY, orbitZ);
+	lightPositions.push_back(orbitCoordinates);
+
+	radius = 1.0f;
+	orbitX = 3.5f + (radius * cosf(radian));
+	orbitY = 8.0f;
+	orbitZ = 1.2f + (radius * sinf(radian));
+
+	orbitCoordinates = glm::vec3(orbitX, orbitY, orbitZ);
+	lightPositions.push_back(orbitCoordinates);
+
+	orbitX = -3.5f + (radius * cosf(radian)) * -1.0f;
+	orbitZ = 1.2f + (radius * sinf(radian)) * -1.0f;
+
+	orbitCoordinates = glm::vec3(orbitX, orbitY, orbitZ);
+	lightPositions.push_back(orbitCoordinates);
+
+	orbitX = -1.6f + (radius * cosf(radian));
+	orbitY = 1.5f;
+	orbitZ = -0.5f + (radius * sinf(radian));
+
+	orbitCoordinates = glm::vec3(orbitX, orbitY, orbitZ);
+	lightPositions.push_back(orbitCoordinates);
+
+	orbitX = 1.6f + (radius * cosf(radian)) * -1.0f;
+	orbitZ = -0.5f + (radius * sinf(radian)) * -1.0f;
+
+	orbitCoordinates = glm::vec3(orbitX, orbitY, orbitZ);
+	lightPositions.push_back(orbitCoordinates);
+
+	// Bloom is on
 	if (bloomShadowToggle)
 	{
 		std::string firstStr = "lights[";
@@ -604,7 +680,7 @@ void Window::displayCallback(GLFWwindow* window)
 		glUniformMatrix4fv(glGetUniformLocation(bloom, "projection"), 1, GL_FALSE, &projection[0][0]);
 		glUniformMatrix4fv(glGetUniformLocation(bloom, "view"), 1, GL_FALSE, &view[0][0]);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, wood);
+		glBindTexture(GL_TEXTURE_2D, metal);
 		suit->draw(glm::mat4(1), bloom);
 
 		// Setup for lighting uniforms
@@ -616,46 +692,44 @@ void Window::displayCallback(GLFWwindow* window)
 			glUniform3fv(glGetUniformLocation(bloom, color.c_str()), 1, &lightColors[i][0]);
 		}
 		glUniform3f(glGetUniformLocation(bloom, "viewPos"), eye.x, eye.y, eye.z);
+		renderFloor(bloom);
 
-		renderScene(bloom);
-
-		// finally show all the light sources as bright cubes
+		// Make light orbs
 		glUseProgram(shaderLight);
 		glUniformMatrix4fv(glGetUniformLocation(shaderLight, "projection"), 1, GL_FALSE, &projection[0][0]);
 		glUniformMatrix4fv(glGetUniformLocation(shaderLight, "view"), 1, GL_FALSE, &view[0][0]);
 
-		for (unsigned int i = 0; i < lightPositions.size(); i++)
+		for (int i = 0; i < lightPositions.size(); i++)
 		{
 			model = glm::mat4(1.0f);
 			model = glm::translate(model, glm::vec3(lightPositions[i]));
 			model = glm::scale(model, glm::vec3(0.1f));
-			model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
 			glUniformMatrix4fv(glGetUniformLocation(shaderLight, "model"), 1, GL_FALSE, &model[0][0]);
 			glUniform3fv(glGetUniformLocation(shaderLight, "lightColor"), 1, &lightColors[i][0]);
 			planet->draw(model, shaderLight);
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-		// 2. blur bright fragments with two-pass Gaussian Blur 
-		// --------------------------------------------------
+		// Create blur with two-pass Gaussian Blur 
 		bool horizontal = true, first_iteration = true;
 		unsigned int amount = 10;
 		glUseProgram(shaderBlur);
-		for (unsigned int i = 0; i < amount; i++)
+
+		for (int i = 0; i < amount; i++)
 		{
 			glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
 			glUniform1i(glGetUniformLocation(shaderBlur, "horizontal"), horizontal);
-			glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBuffers[1] : pingpongColorbuffers[!horizontal]);  // bind texture of other framebuffer (or scene if first iteration)
+			glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBuffers[1] : pingpongColorbuffers[!horizontal]);
 			renderQuad();
 			horizontal = !horizontal;
 			if (first_iteration)
+			{
 				first_iteration = false;
+			}
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-		// 3. now render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer's (clamped) color range
-		// --------------------------------------------------------------------------------------------------------------------------
-
+		// Render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glUseProgram(shaderFinal);
 		glActiveTexture(GL_TEXTURE0);
@@ -665,87 +739,77 @@ void Window::displayCallback(GLFWwindow* window)
 		glUniform1i(glGetUniformLocation(shaderFinal, "bloom"), bloomToggle);
 		glUniform1f(glGetUniformLocation(shaderFinal, "exposure"), exposure);
 		renderQuad();
-		std::cout << "bloom: " << (bloom ? "on" : "off") << "| exposure: " << exposure << std::endl;
-
-
-		//lightPos = glm::vec3(eye.x, eye.y, eye.z);
-		// 1. render depth of scene to texture (from light's perspective)
-			// --------------------------------------------------------------
 	}
-	else
+	else // Shadows are on
 	{
-	glm::mat4 lightProjection, lightView;
-	glm::mat4 lightSpaceMatrix;
-	float near_plane = 1.0f, far_plane = 7.5f;
-	//lightProjection = glm::perspective(glm::radians(45.0f), (GLfloat)SHADOW_WIDTH / (GLfloat)SHADOW_HEIGHT, near_plane, far_plane); // note that if you use a perspective projection matrix you'll have to change the light position as the current light position isn't enough to reflect the whole scene
-	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-	lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
-	lightSpaceMatrix = lightProjection * lightView;
-	// render scene from light's point of view
-	glUseProgram(shadowDepth);
-	glUniformMatrix4fv(glGetUniformLocation(shadowDepth, "lightSpaceMatrix"), 1, GL_FALSE, &lightSpaceMatrix[0][0]);
+		// Render depth of scene to texture based on light
+		glm::mat4 lightProjection, lightView, lightSpaceMatrix;
+		float near_plane = 1.0f, far_plane = 7.5f;
+		lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 20.0f, near_plane, far_plane);
+		lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+		lightSpaceMatrix = lightProjection * lightView;
 
-	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-	glClear(GL_DEPTH_BUFFER_BIT);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, wood);
-	renderScene(shadowDepth);
+		// Render scene from light's POV
+		glUseProgram(shadowDepth);
+		glUniformMatrix4fv(glGetUniformLocation(shadowDepth, "lightSpaceMatrix"), 1, GL_FALSE, &lightSpaceMatrix[0][0]);
 
-	suit->draw(glm::mat4(1.0f), shadowDepth);
-	for (int i = 0; i < 1; i++)
-	{
-		model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(lightPositions[i]));
-		model = glm::scale(model, glm::vec3(0.5f));
-		model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
-		planet->draw(model, shadowDepth);
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, shadowWidth, shadowHeight);
+		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, metal);
+		renderFloor(shadowDepth);
+		suit->draw(glm::mat4(1.0f), shadowDepth);
 
-	// reset viewport
-	glViewport(0, 0, width, height);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		for (int i = 0; i < lightPositions.size(); i++)
+		{
+			model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(lightPositions[i]));
+			model = glm::scale(model, glm::vec3(0.1f));
+			planet->draw(model, shadowDepth);
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// 2. render scene as normal using the generated depth/shadow map  
-	// --------------------------------------------------------------
-	glViewport(0, 0, width, height);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUseProgram(shadow);
-	glUniformMatrix4fv(glGetUniformLocation(shadow, "projection"), 1, GL_FALSE, &projection[0][0]);
-	glUniformMatrix4fv(glGetUniformLocation(shadow, "view"), 1, GL_FALSE, &view[0][0]);
-	// set light uniforms
-	glUniform3f(glGetUniformLocation(shadow, "viewPos"), eye.x, eye.y, eye.z);
-	glUniform3f(glGetUniformLocation(shadow, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-	glUniformMatrix4fv(glGetUniformLocation(shadow, "lightSpaceMatrix"), 1, GL_FALSE, &lightSpaceMatrix[0][0]);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, wood);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, depthMap);
-	renderScene(shadow);
-	suit->draw(glm::mat4(1.0f), shadow);
+		// Reset viewport
+		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	for (int i = 0; i < 1; i++)
-	{
-		model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(lightPositions[i]));
-		model = glm::scale(model, glm::vec3(0.5f));
-		model = glm::rotate(model, angle, glm::vec3(0, 1, 0));
-		planet->draw(model, shadow);
-	}
+		// Render scene normally using shadow map  
+		glUseProgram(shadow);
+		glUniformMatrix4fv(glGetUniformLocation(shadow, "projection"), 1, GL_FALSE, &projection[0][0]);
+		glUniformMatrix4fv(glGetUniformLocation(shadow, "view"), 1, GL_FALSE, &view[0][0]);
+		// Set lighting uniforms
+		glUniform3f(glGetUniformLocation(shadow, "viewPos"), eye.x, eye.y, eye.z);
+		glUniform3f(glGetUniformLocation(shadow, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniformMatrix4fv(glGetUniformLocation(shadow, "lightSpaceMatrix"), 1, GL_FALSE, &lightSpaceMatrix[0][0]);
+		glUniform1i(glGetUniformLocation(shadow, "shadowToggle"), shadowToggle);
 
-	// render Depth map to quad for visual debugging
-	// ---------------------------------------------
-	glUseProgram(shadowDebug);
-	glUniform1f(glGetUniformLocation(shadowDebug, "near_plane"), near_plane);
-	glUniform1f(glGetUniformLocation(shadowDebug, "far_plane"), far_plane);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, depthMap);
-	glViewport(width * 0.8, 0, width * 0.2, height * 0.2);
-	renderQuad();
-	glViewport(0, 0, width, height);
-	drawParticles(0);
-	drawParticles(1);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, metal);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depthMap);
+		renderFloor(shadow);
+		suit->draw(glm::mat4(1.0f), shadow);
+
+		for (int i = 0; i < lightPositions.size(); i++)
+		{
+			model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(lightPositions[i]));
+			model = glm::scale(model, glm::vec3(0.1f));
+			planet->draw(model, shadow);
+		}
+
+		// Debug window
+		glUseProgram(shadowDebug);
+		glUniform1f(glGetUniformLocation(shadowDebug, "near_plane"), near_plane);
+		glUniform1f(glGetUniformLocation(shadowDebug, "far_plane"), far_plane);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, depthMap);
+		glViewport(width * 0.7, height * 0.7, width * 0.3, height * 0.3);
+		renderQuad();
+		glViewport(0, 0, width, height);
+		drawParticles(0);
+		drawParticles(1);
 	}
 
 	glfwSwapBuffers(window);
@@ -850,27 +914,35 @@ void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, 
 			// Close the window. This causes the program to also terminate.
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			break;
-		case GLFW_KEY_SPACE:
+		case GLFW_KEY_SPACE: // Toggles shadows or bloom based on current scene
 			SoundEngine->stopAllSounds();
-			if (bloomToggle)
+			if (bloomShadowToggle)
 			{
-				SoundEngine->play2D("audio/off.mp3", GL_FALSE);
+				if (bloomToggle)
+				{
+					SoundEngine->play2D("audio/off.mp3", GL_FALSE);
+				}
+				else
+				{
+					SoundEngine->play2D("audio/on.mp3", GL_FALSE);
+				}
+				bloomToggle = !bloomToggle;
 			}
 			else
 			{
-				SoundEngine->play2D("audio/on.mp3", GL_FALSE);
+				if (shadowToggle)
+				{
+					SoundEngine->play2D("audio/off.mp3", GL_FALSE);
+				}
+				else
+				{
+					SoundEngine->play2D("audio/on.mp3", GL_FALSE);
+				}
+				shadowToggle = !shadowToggle;
 			}
-			bloomToggle = !bloomToggle;
 			break;
-		case GLFW_KEY_N: // Normal coloring
-			if (normalColoring) 
-			{
-				normalColoring = 0;
-			}
-			else 
-			{
-				normalColoring = 1;
-			}
+		case GLFW_KEY_M: // Toggles WASD to move the lighting
+			lightMovement = !lightMovement;
 			break;
 		case GLFW_KEY_T: // Toggle between bloom and shadows
 			if (bloomShadowToggle)
@@ -882,18 +954,18 @@ void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, 
 				bloomShadowToggle = true;
 			}
 			break;
-		case GLFW_KEY_P: // Pause and play sounds
+		case GLFW_KEY_P: // Toggles stars
 			SoundEngine->stopAllSounds();
-			if (raining)
+			if (starsToggle)
 			{
-				raining = false;
+				starsToggle = false;
 				playingSound->setIsPaused(true);
 				SoundEngine->play2D("audio/off.mp3", GL_FALSE);
 			}
 			else
 			{
 				SoundEngine->play2D("audio/on.mp3", GL_FALSE);
-				raining = true;
+				starsToggle = true;
 				playingSound->setIsPaused(false);
 			}
 			break;

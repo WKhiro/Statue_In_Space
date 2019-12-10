@@ -114,8 +114,8 @@ void Geometry::parse(std::string objFilename)
 			{
 				unsigned int v_faceX, v_faceY, v_faceZ;
 				unsigned int vn_faceX, vn_faceY, vn_faceZ;
-				char ignore;
-				unsigned ignore2;
+				char ignore; // ignores "/"
+				int ignore2; // ignores the value itself
 				ss >> v_faceX >> ignore >> ignore2 >> ignore >> vn_faceX;
 				ss >> v_faceY >> ignore >> ignore2 >> ignore >> vn_faceY;
 				ss >> v_faceZ >> ignore >> ignore2 >> ignore >> vn_faceZ;

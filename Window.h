@@ -36,11 +36,11 @@ public:
 	static glm::mat4 view; 
 	static double oldX, oldY;
 
-	static int Window::normalColoring;
-
-	static glm::vec3 Window::currentPos;
-
 	static unsigned int loadTexture(char const* path, bool gammaCorrection);
+	static void initParticles(int i);
+	static void drawParticles(int directionOfParticles);
+	static void renderFloor(GLint shader);
+	static void renderQuad();
 	static bool initializeProgram();
 	static bool initializeObjects();
 	static void cleanUp();
