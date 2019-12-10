@@ -14,6 +14,10 @@ Controls:
      - t - toggles between bloom and shadows
   - BLOOM CONTROLS
      - spacebar - turns on and off bloom
+     - jk - increase and decrease exposure
   - SHADOW CONTROLS
      - spacebar - turns on and off shadows
-     - m - makes wasd control the light position
+     - m - turns on and off control of lighting
+  - LIGHT CONTROLS
+     - wasd - controls x-axis/y-axis of light position
+     - qe - controls z-axis of light position
