@@ -1,13 +1,15 @@
-CSE 167 Final Project: Statue in Space
+# Statue in Space
 
-Utilizes the following features:
+A final project I made with a partner in my Computer Graphics class. It implements the following features in OpenGL:
 - Particle effects
 - Sound effects
 - FPS controls
 - Bloom
 - Shadow Mapping
 
-Controls:
+[Youtube link](https://www.youtube.com/watch?v=wzzuQ6k27hU) to a demo of the project.
+
+## Controls:
   - GENERAL CONTROLS
      - wasd - controls FPS movement
      - p - pauses and unpauses particle effects
