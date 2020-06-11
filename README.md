@@ -1,6 +1,6 @@
 # Statue in Space
 
-A final project I made with a partner in my Computer Graphics class. It implements the following features in OpenGL:
+A final project I made with a partner in my Computer Graphics class. Showcases the following features in OpenGL (C++):
 - Particle effects
 - Sound effects
 - FPS controls
@@ -9,7 +9,7 @@ A final project I made with a partner in my Computer Graphics class. It implemen
 
 [Youtube link](https://www.youtube.com/watch?v=wzzuQ6k27hU) to a demo of the project.
 
-## Controls:
+## Controls
   - GENERAL CONTROLS
      - wasd - controls FPS movement
      - p - pauses and unpauses particle effects
